@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Log Monitoring Dashboard</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Modern Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            background: linear-gradient(135deg, #0f0f0f, #1c1c1c);
+            color: #dcdcdc;
+            font-family: 'Poppins', sans-serif;
+        }
+
+        /* ===== SYSTEM STATUS ===== */
+
+        .alert-success {
+            background: #1e7a47;   /* softer green */
+            color: #ffffff;
+            border: none;
+        }
+
+        .alert-danger {
+            background: #8b1e1e;   /* softer red */
+            color: #ffffff;
+            border: none;
+        }
+        .system-banner h2 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 38px;
+            letter-spacing: 3px;
+            font-weight: 800;
+            margin-bottom: 8px;
+                }
+
+        .system-banner p {
+            font-family: 'Poppins', sans-serif;
+            font-size: 15px;
+            letter-spacing: 1px;
+            opacity: 0.9;
+        }
+
+        /* ===== CARDS ===== */
+
+        .dashboard-card {
+            background: #1a1a1a;
+            border-radius: 16px;
+            padding: 25px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.6);
+            margin-bottom: 30px;
+            border: 1px solid #2a2a2a;
+        }
+
+        .stat-card {
+            background: #222222;
+            border-radius: 14px;
+            padding: 35px;
+            text-align: center;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.6);
+            border: 1px solid #2c2c2c;
+        }
+
+        .stat-card h2 {
+            font-size: 42px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            color: #ffffff;
+        }
+
+        .section-title {
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #ffffff;
+        }
+
+        /* ===== TABLES ===== */
+
+        .table-dark {
+            background-color: #1f1f1f;
+            color: #dcdcdc;
+        }
+
+        .table-dark th {
+            background-color: #2a2a2a;
+            color: #ffffff;
+        }
+
+        .table-danger {
+            background-color: #2b1b1b;
+            color: #f5c6c6;
+        }
+
+        /* ===== UPLOAD ===== */
+
+        .upload-box {
+            background: #202020;
+            border-radius: 14px;
+            padding: 20px;
+            border: 1px solid #2a2a2a;
+        }
+
+        .btn-warning {
+            background: #d4a017;
+            border: none;
+            font-weight: 600;
+        }
+
+        .btn-warning:hover {
+            background: #c18e12;
+        }
+
+        /* ===== CHART CONTAINER ===== */
+
+        .chart-container {
+            background: #1a1a1a;
+            padding: 20px;
+            border-radius: 14px;
+            border: 1px solid #2a2a2a;
+            text-align: center;
+        }
+
+        canvas {
+            max-width: 450px !important;   /* smaller charts */
+            max-height: 350px !important;
+            margin: auto;
+        }
+
+        @keyframes blink {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+
+        h2, h3, h4, h5 {
+            letter-spacing: 1px;
+        }
+    </style>
+</head>
+
+<body>
+
+{% if system_status == "SYSTEM SAFE" %}
+<div class="alert alert-success text-center mb-0 py-3 system-banner">
+    <h2>SYSTEM SAFE</h2>
+    <p>All systems functioning normally. No security alerts present !</p>
+</div>
+{% else %}
+<div class="alert alert-danger text-center mb-0 py-3 fw-bold system-banner" style="animation: blink 1.5s infinite;">
+    <h2>UNDER ATTACK</h2>
+    <p>High-risk anomalies detected in monitored logs. Immediate security review recommended !</p>
+</div>
+{% endif %}
+
+<div class="container mt-5">
+
+    <div class="dashboard-card upload-box">
+        <h5 class="section-title"> User Log Submission for Threat Analysis</h5>
+        <form method="POST" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="row">
+                <div class="col-md-9">
+                    <input type="file" name="log_file" class="form-control">
+                </div>
+                <div class="col-md-3">
+                    <button type="submit" class="btn btn-warning w-100">
+                        Scan Logs
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    {% if show_summary %}
+    <div class="dashboard-card">
+        <h5>Threat Intelligence Summary</h5>
+        <ul>
+            {% for attack in attack_summary %}
+            <li>
+                <strong>{{ attack.ip_address }}</strong>
+                → {{ attack.alert_type }}
+                ({{ attack.count }} log events)
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="stat-card">
+                <h4>Total Logs</h4>
+                <h2>{{ total_logs }}</h2>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="stat-card">
+                <h4>Total Alerts</h4>
+                <h2>{{ total_alerts }}</h2>
+            </div>
+        </div>
+    </div>
+
+    <div class="dashboard-card mt-5">
+        <h3 class="section-title">Top 5 Suspicious IP Sources</h3>
+        <table class="table table-dark table-striped">
+            <thead>
+                <tr>
+                    <th>IP Address</th>
+                    <th>Total Requests</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for ip in top_ips %}
+                <tr>
+                    <td>{{ ip.ip_address }}</td>
+                    <td>{{ ip.total }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="dashboard-card">
+        <h3 class="section-title text-danger">Recent Alerts</h3>
+        <table class="table table-danger table-striped">
+            <thead>
+                <tr>
+                    <th>IP</th>
+                    <th>Type</th>
+                    <th>Message</th>
+                    <th>Time</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for alert in recent_alerts %}
+                <tr>
+                    <td>{{ alert.ip_address }}</td>
+                    <td>{{ alert.alert_type }}</td>
+                    <td>{{ alert.message }}</td>
+                    <td>{{ alert.created_at|date:"M d, Y H:i:s" }}</td>
+                    <td>
+                        {% if not alert.is_resolved %}
+                        <a href="{% url 'resolve_alert' alert.id %}" class="btn btn-sm btn-success">
+                            Resolve
+                        </a>
+                        {% else %}
+                        <span class="badge bg-secondary">Resolved</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="dashboard-card chart-container">
+        <h3 class="section-title text-center">Threat Analysis of Uploaded Logs</h3>
+        {% if show_summary and session_labels|length > 0 %}
+        <canvas id="sessionChart"></canvas>
+        {% else %}
+        <p class="text-success fw-bold">Log analysis complete. No anomalous patterns detected.</p>
+        {% endif %}
+    </div>
+
+    <div class="dashboard-card chart-container mt-4">
+        <h3 class="section-title text-center">Complete Database Threat Distribution</h3>
+        {% if overall_labels %}
+        <canvas id="overallChart"></canvas>
+        {% else %}
+        <p class="text-muted">No attack data available in database.</p>
+        {% endif %}
+    </div>
+
+</div>
+
+<script>
+const sessionLabels = JSON.parse('{{ session_labels|escapejs }}');
+const sessionCounts = JSON.parse('{{ session_counts|escapejs }}');
+const overallLabels = JSON.parse('{{ overall_labels|escapejs }}');
+const overallCounts = JSON.parse('{{ overall_counts|escapejs }}');
+
+
+// ================= PIE CHART (Like Image 1) =================
+if (sessionLabels.length > 0) {
+    new Chart(document.getElementById('sessionChart'), {
+        type: 'pie',
+        data: {
+            labels: sessionLabels,
+            datasets: [{
+                data: sessionCounts,
+                backgroundColor: [
+                    '#5B9BD5',  // Blue (30%)
+                    '#ED7D31',  // Orange (7%)
+                    '#A5A5A5',  // Grey (13%)
+                    '#FFC000',  // Yellow (7%)
+                    '#4472C4',  // Dark Blue (10%)
+                    '#70AD47'   // Green (33%)
+                ],
+                borderWidth: 1,
+                borderColor: '#1a1a1a'
+            }]
+        },
+        options: {
+            plugins: {
+                legend: {
+                    labels: { color: '#ffffff' }
+                }
+            }
+        }
+    });
+}
+
+
+// ================= BAR CHART (Like Image 2) =================
+if (overallLabels.length > 0) {
+    new Chart(document.getElementById('overallChart'), {
+        type: 'bar',
+        data: {
+            labels: overallLabels,
+            datasets: [{
+                label: 'Total Attacks',
+                data: overallCounts,
+                backgroundColor: [
+                    '#5B9BD5',
+                    '#FFC000',
+                    '#92D050',
+                    '#F4B183',
+                    '#2E75B6',
+                    '#C00000',
+                    '#7030A0'
+                ],
+                borderRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: {
+                    ticks: { color: '#ffffff' },
+                    grid: { color: '#2a2a2a' }
+                },
+                y: {
+                    beginAtZero: true,
+                    ticks: { color: '#ffffff' },
+                    grid: { color: '#2a2a2a' }
+                }
+            },
+            plugins: {
+                legend: {
+                    labels: { color: '#ffffff' }
+                }
+            }
+        }
+    });
+}
+</script>
+
+</body>
+</html>
